@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบคำนวณความจุน้ำคลอง น้ำล้น และกระสอบทรายอัจฉริยะ</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Prompt', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <header class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 py-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-3 rounded-2xl shadow-inner text-xl">
+                    <i class="fa-solid fa-water"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold tracking-tight">ระบบคำนวณความจุน้ำคลองและกระสอบทราย</h1>
+                    <p class="text-blue-200 text-xs md:text-sm mt-0.5">วิเคราะห์หน้าตัดคลองด้วย Shoelace Formula ประเมินน้ำล้น และคำนวณกระสอบทรายอัตโนมัติ</p>
+                </div>
+            </div>
+            <button onclick="loadLatPhraoPreset()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition shadow-md flex items-center gap-2 border border-blue-400/35">
+                <i class="fa-solid fa-rotate-right"></i> รีเซ็ตพิกัดคลองลาดพร้าว
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 flex-grow w-full">
+        
+        <!-- Left Column: Inputs & Parameters -->
+        <div class="lg:col-span-6 space-y-6">
+            
+            <!-- 1. Coordinate Inputs -->
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <span class="bg-indigo-100 text-indigo-700 w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold">1</span> 
+                        พิกัดหน้าตัดคลอง 5 จุด ($x=0$ กึ่งกลาง)
+                    </h2>
+                    <span class="text-xs text-slate-400">หน่วย: เมตร</span>
+                </div>
+                <div class="space-y-3">
+                    <div class="grid grid-cols-12 gap-2 text-xs font-semibold text-slate-500 px-1">
+                        <div class="col-span-4">จุดพิกัด</div>
+                        <div class="col-span-4">แกน X (m)</div>
+                        <div class="col-span-4">แกน Y (m)</div>
+                    </div>
+                    <div id="points-container" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- 2. Water Level & Canal Length -->
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
+                <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 mb-4">
+                    <span class="bg-indigo-100 text-indigo-700 w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold">2</span> 
+                    ระดับน้ำปัจจุบันและความยาวคลอง
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">ระดับน้ำปัจจุบัน ($y$) (m)</label>
+                        <input type="number" id="waterLevel" step="0.05" value="0.20" oninput="calculateAll()" 
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none text-sm font-medium">
+                        <span class="text-[10px] text-slate-400 mt-1 block">อ้างอิงระดับน้ำทะเล $y=0$</span>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">ความยาวช่วงคลอง (m)</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="canalLength" step="100" value="22000" oninput="calculateAll()" 
+                                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none text-sm font-medium">
+                            <button onclick="setLatPhraoLength()" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition border border-blue-200">
+                                22 กม.
+                            </button>
+                        </div>
+                        <span class="text-[10px] text-slate-400 mt-1 block">มาตรฐานคลองลาดพร้าว = 22,000 ม.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Sandbag Specs -->
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
+                <h2 class="text-base font-bold text-slate-900 flex items-center gap-2 mb-4">
+                    <span class="bg-indigo-100 text-indigo-700 w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold">3</span> 
+                    ขนาดยูนิตกระสอบทรายและระยะปลอดภัย
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">สูงกระสอบ (m)</label>
+                        <input type="number" id="bagHeight" step="0.01" value="0.30" oninput="calculateAll()" 
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none text-sm font-medium">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">กว้างกระสอบ (m)</label>
+                        <input type="number" id="bagWidth" step="0.01" value="0.50" oninput="calculateAll()" 
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none text-sm font-medium">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">ระยะปลอดภัย (m)</label>
+                        <input type="number" id="safetyMargin" step="0.01" value="0.10" oninput="calculateAll()" 
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none text-sm font-medium">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Visualization & Dashboard -->
+        <div class="lg:col-span-6 space-y-6">
+            
+            <!-- Chart Card -->
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-area text-indigo-600"></i> กราฟจำลองหน้าตัดคลองและผิวน้ำ
+                    </h2>
+                    <span class="text-xs text-slate-400">แกน X: ระยะทาง, แกน Y: ความสูง</span>
+                </div>
+                <div class="relative w-full h-[300px] bg-slate-50 rounded-2xl p-2 border border-slate-100">
+                    <canvas id="canalChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Results Dashboard Card -->
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 space-y-6">
+                <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-clipboard-check text-indigo-600"></i> รายงานผลการคำนวณและประเมินสถานการณ์
+                </h2>
+
+                <!-- Status Alert Banner -->
+                <div id="statusBanner" class="p-4 rounded-2xl border flex items-start gap-3.5 transition-all">
+                    <div id="statusIcon" class="text-2xl mt-0.5"></div>
+                    <div>
+                        <h3 id="statusTitle" class="font-bold text-base">กำลังคำนวณ...</h3>
+                        <p id="statusDesc" class="text-xs sm:text-sm mt-1 leading-relaxed"></p>
+                    </div>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <span class="text-xs font-medium text-slate-500 block">พื้นที่หน้าตัดคลองสูงสุด</span>
+                        <span id="maxAreaVal" class="text-xl font-bold text-slate-800 mt-1 block">0.00 <span class="text-xs font-normal text-slate-500">ตร.ม.</span></span>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <span class="text-xs font-medium text-slate-500 block">พื้นที่หน้าตัดน้ำปัจจุบัน</span>
+                        <span id="waterAreaVal" class="text-xl font-bold text-slate-800 mt-1 block">0.00 <span class="text-xs font-normal text-slate-500">ตร.ม.</span></span>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <span class="text-xs font-medium text-slate-500 block">เปอร์เซ็นต์ความจุน้ำ</span>
+                        <span id="capacityPercentVal" class="text-xl font-bold text-slate-800 mt-1 block">0.00%</span>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <span class="text-xs font-medium text-slate-500 block">ปริมาตรน้ำส่วนที่ล้น</span>
+                        <span id="overflowVolumeVal" class="text-xl font-bold text-slate-800 mt-1 block">0.00 <span class="text-xs font-normal text-slate-500">ลบ.ม.</span></span>
+                    </div>
+                </div>
+
+                <!-- Sandbag Specific Output Box (Visible when Critical) -->
+                <div id="sandbagSection" class="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-2xl p-5 hidden space-y-4 shadow-sm">
+                    <h4 class="font-bold text-indigo-950 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-shield-cat text-indigo-600"></i> แผนการป้องกันด้วยกระสอบทรายกั้นน้ำล้น
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-indigo-900">
+                        <div class="bg-white p-2.5 rounded-xl border border-indigo-100">ความสูงน้ำล้นตลิ่ง: <strong id="overflowHeightVal" class="text-slate-900">0.00</strong> ม.</div>
+                        <div class="bg-white p-2.5 rounded-xl border border-indigo-100">ความสูงที่ต้องกั้นรวม: <strong id="requiredHeightVal" class="text-slate-900">0.00</strong> ม.</div>
+                        <div class="bg-white p-2.5 rounded-xl border border-indigo-100">จำนวนชั้นกระสอบทราย: <strong id="bagLayersVal" class="text-indigo-700 text-sm">0</strong> ชั้น</div>
+                        <div class="bg-white p-2.5 rounded-xl border border-indigo-100">จำนวนกระสอบทรายรวม: <strong id="totalBagsVal" class="text-indigo-700 text-sm font-extrabold">0</strong> กระสอบ</div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-auto py-4 text-center text-xs text-slate-500">
+        <p>ระบบคำนวณอุทกภัยคลองด้วย Shoelace Formula | มาตรฐานคำนวณ กทม.</p>
+    </footer>
+
+    <script>
+        let canalPoints = [
+            { id: 'P1 (สันตลิ่งฝั่งซ้าย)', x: -12.50, y: 1.22 },
+            { id: 'P2 (ฐานคันตลิ่งซ้าย)', x: -3.16, y: -1.94 },
+            { id: 'P3 (ท้องคลองกลาง)', x: 0.00, y: -1.94 },
+            { id: 'P4 (ฐานคันตลิ่งขวา)', x: 3.16, y: -1.94 },
+            { id: 'P5 (สันตลิ่งฝั่งขวา)', x: 12.50, y: 1.22 }
+        ];
+
+        let chartInstance = null;
+
+        function renderPointsInputs() {
+            const container = document.getElementById('points-container');
+            container.innerHTML = '';
+            canalPoints.forEach((p, idx) => {
+                const row = document.createElement('div');
+                row.className = 'grid grid-cols-12 gap-2 items-center';
+                row.innerHTML = `
+                    <div class="col-span-4 text-xs font-semibold text-slate-700 truncate" title="${p.id}">${p.id}</div>
+                    <div class="col-span-4">
+                        <input type="number" step="0.01" value="${p.x}" id="px_${idx}" oninput="updatePoint(${idx})" 
+                            class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-1 focus:ring-indigo-500 focus:bg-white focus:outline-none">
+                    </div>
+                    <div class="col-span-4">
+                        <input type="number" step="0.01" value="${p.y}" id="py_${idx}" oninput="updatePoint(${idx})" 
+                            class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-1 focus:ring-indigo-500 focus:bg-white focus:outline-none">
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function updatePoint(idx) {
+            const xVal = parseFloat(document.getElementById(`px_${idx}`).value);
+            const yVal = parseFloat(document.getElementById(`py_${idx}`).value);
+            if (!isNaN(xVal)) canalPoints[idx].x = xVal;
+            if (!isNaN(yVal)) canalPoints[idx].y = yVal;
+            calculateAll();
+        }
+
+        function loadLatPhraoPreset() {
+            canalPoints = [
+                { id: 'P1 (สันตลิ่งฝั่งซ้าย)', x: -12.50, y: 1.22 },
+                { id: 'P2 (ฐานคันตลิ่งซ้าย)', x: -3.16, y: -1.94 },
+                { id: 'P3 (ท้องคลองกลาง)', x: 0.00, y: -1.94 },
+                { id: 'P4 (ฐานคันตลิ่งขวา)', x: 3.16, y: -1.94 },
+                { id: 'P5 (สันตลิ่งฝั่งขวา)', x: 12.50, y: 1.22 }
+            ];
+            document.getElementById('waterLevel').value = 0.20;
+            document.getElementById('canalLength').value = 22000;
+            renderPointsInputs();
+            calculateAll();
+        }
+
+        function setLatPhraoLength() {
+            document.getElementById('canalLength').value = 22000;
+            calculateAll();
+        }
+
+        function shoelaceArea(points) {
+            let n = points.length;
+            let area = 0.0;
+            for (let i = 0; i < n; i++) {
+                let j = (i + 1) % n;
+                area += points[i].x * points[j].y;
+                area -= points[j].x * points[i].y;
+            }
+            return Math.abs(area) / 2.0;
+        }
+
+        function getCanalMaxAreaAndPolygon() {
+            let bankLevel = Math.min(canalPoints[0].y, canalPoints[canalPoints.length - 1].y);
+            let leftX = canalPoints[0].x;
+            let rightX = canalPoints[canalPoints.length - 1].x;
+            
+            let poly = [...canalPoints];
+            poly.push({ x: rightX, y: bankLevel });
+            poly.push({ x: leftX, y: bankLevel });
+            
+            return {
+                area: shoelaceArea(poly),
+                bankLevel: bankLevel,
+                boundaryPolygon: poly
+            };
+        }
+
+        function calculateWaterData(waterLevel) {
+            let lowestY = Math.min(...canalPoints.map(p => p.y));
+            let highestY = Math.max(...canalPoints.map(p => p.y));
+
+            if (waterLevel <= lowestY) {
+                return { area: 0, polygon: [] };
+            }
+
+            let intersectXs = [];
+            canalPoints.forEach(p => {
+                if (Math.abs(p.y - waterLevel) < 1e-6) {
+                    intersectXs.push(p.x);
+                }
+            });
+
+            for (let i = 0; i < canalPoints.length - 1; i++) {
+                let p1 = canalPoints[i];
+                let p2 = canalPoints[i+1];
+                let minY = Math.min(p1.y, p2.y);
+                let maxY = Math.max(p1.y, p2.y);
+                
+                if (waterLevel > minY && waterLevel < maxY) {
+                    let xInter = p1.x + (waterLevel - p1.y) * (p2.x - p1.x) / (p2.y - p1.y);
+                    intersectXs.push(xInter);
+                }
+            }
+
+            intersectXs = [...new Set(intersectXs)].sort((a, b) => a - b);
+
+            if (intersectXs.length < 2) {
+                if (waterLevel >= highestY) {
+                    let area = shoelaceArea(canalPoints);
+                    return { area: area, polygon: canalPoints };
+                }
+                return { area: 0, polygon: [] };
+            }
+
+            let xMin = intersectXs[0];
+            let xMax = intersectXs[intersectXs.length - 1];
+
+            let waterPoly = [{ x: xMin, y: waterLevel }];
+            canalPoints.forEach(p => {
+                if (p.x > xMin && p.x < xMax && p.y <= waterLevel) {
+                    waterPoly.push(p);
+                }
+            });
+            waterPoly.push({ x: xMax, y: waterLevel });
+
+            let sampleXs = [xMin];
+            canalPoints.forEach(p => {
+                if (p.x > xMin && p.x < xMax) sampleXs.push(p.x);
+            });
+            sampleXs.push(xMax);
+            sampleXs = [...new Set(sampleXs)].sort((a, b) => a - b);
+
+            function getCanalY(x) {
+                for (let i = 0; i < canalPoints.length - 1; i++) {
+                    let p1 = canalPoints[i];
+                    let p2 = canalPoints[i+1];
+                    if ((x >= p1.x && x <= p2.x) || (x >= p2.x && x <= p1.x)) {
+                        if (p1.x === p2.x) return p1.y;
+                        return p1.y + (x - p1.x) * (p2.y - p1.y) / (p2.x - p1.x);
+                    }
+                }
+                return waterLevel;
+            }
+
+            let area = 0;
+            for (let i = 0; i < sampleXs.length - 1; i++) {
+                let x1 = sampleXs[i];
+                let x2 = sampleXs[i+1];
+                let h1 = waterLevel - getCanalY(x1);
+                let h2 = waterLevel - getCanalY(x2);
+                if (h1 >= 0 && h2 >= 0) {
+                    area += ((h1 + h2) / 2) * (x2 - x1);
+                }
+            }
+
+            return { area: Math.max(0, area), polygon: waterPoly };
+        }
+
+        function calculateAll() {
+            const waterLevel = parseFloat(document.getElementById('waterLevel').value) || 0;
+            const canalLength = parseFloat(document.getElementById('canalLength').value) || 0;
+            const bagHeight = parseFloat(document.getElementById('bagHeight').value) || 0.3;
+            const bagWidth = parseFloat(document.getElementById('bagWidth').value) || 0.5;
+            const safetyMargin = parseFloat(document.getElementById('safetyMargin').value) || 0.1;
+
+            const canalInfo = getCanalMaxAreaAndPolygon();
+            const maxArea = canalInfo.area;
+            document.getElementById('maxAreaVal').innerHTML = `${maxArea.toFixed(2)} <span class="text-xs font-normal text-slate-500">ตร.ม.</span>`;
+
+            const waterData = calculateWaterData(waterLevel);
+            const waterArea = waterData.area;
+            document.getElementById('waterAreaVal').innerHTML = `${waterArea.toFixed(2)} <span class="text-xs font-normal text-slate-500">ตร.ม.</span>`;
+
+            const capacityPercent = maxArea > 0 ? (waterArea / maxArea) * 100 : 0;
+            document.getElementById('capacityPercentVal').innerText = `${capacityPercent.toFixed(1)}%`;
+
+            const statusBanner = document.getElementById('statusBanner');
+            const statusIcon = document.getElementById('statusIcon');
+            const statusTitle = document.getElementById('statusTitle');
+            const statusDesc = document.getElementById('statusDesc');
+            const sandbagSection = document.getElementById('sandbagSection');
+
+            let isCritical = false;
+
+            if (capacityPercent < 80) {
+                statusBanner.className = 'p-4 rounded-2xl border bg-emerald-50 border-emerald-200 text-emerald-900 flex items-start gap-3.5';
+                statusIcon.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600"></i>';
+                statusTitle.innerText = 'ระยะปกติ (Normal)';
+                statusDesc.innerText = 'ปริมาณน้ำต่ำกว่า 80% ของความจุสูงสุด สถานการณ์อยู่ในเกณฑ์ปลอดภัย';
+                sandbagSection.classList.add('hidden');
+            } else if (capacityPercent < 100) {
+                statusBanner.className = 'p-4 rounded-2xl border bg-amber-50 border-amber-200 text-amber-900 flex items-start gap-3.5';
+                statusIcon.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-600"></i>';
+                statusTitle.innerText = 'ระยะเฝ้าระวัง (Warning)';
+                statusDesc.innerText = 'ปริมาณน้ำอยู่ระหว่าง 80% ถึง 99% ควรติดตามสถานการณ์น้ำอย่างใกล้ชิด';
+                sandbagSection.classList.add('hidden');
+            } else {
+                statusBanner.className = 'p-4 rounded-2xl border bg-rose-50 border-rose-200 text-rose-900 flex items-start gap-3.5';
+                statusIcon.innerHTML = '<i class="fa-solid fa-radiation text-rose-600 animate-pulse"></i>';
+                statusTitle.innerText = 'ระยะวิกฤต / น้ำล้นตลิ่ง (Critical)';
+                statusDesc.innerText = 'ปริมาณน้ำสูงเกินขีดจำกัดความจุคลอง 100% เกิดภาวะน้ำล้นตลิ่ง ต้องป้องกันด่วน!';
+                isCritical = true;
+                sandbagSection.classList.remove('hidden');
+            }
+
+            const excessArea = Math.max(0, waterArea - maxArea);
+            const overflowVolume = excessArea * canalLength;
+            document.getElementById('overflowVolumeVal').innerHTML = `${overflowVolume.toLocaleString(undefined, {maximumFractionDigits: 0})} <span class="text-xs font-normal text-slate-500">ลบ.ม.</span>`;
+
+            const bankLevelY = canalInfo.bankLevel;
+            const overflowHeight = Math.max(0, waterLevel - bankLevelY);
+            const requiredHeight = overflowHeight + safetyMargin;
+            const bagLayers = bagHeight > 0 ? Math.ceil(requiredHeight / bagHeight) : 0;
+            const totalBags = Math.round(4.5 * bagLayers * canalLength * 1.15);
+
+            if (isCritical) {
+                document.getElementById('overflowHeightVal').innerText = overflowHeight.toFixed(2);
+                document.getElementById('requiredHeightVal').innerText = requiredHeight.toFixed(2);
+                document.getElementById('bagLayersVal').innerText = bagLayers;
+                document.getElementById('totalBagsVal').innerText = totalBags.toLocaleString() + ' กระสอบ';
+            }
+
+            updateChart(waterLevel, waterData.polygon);
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('canalChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'โครงสร้างคลอง',
+                            data: [],
+                            showLine: true,
+                            borderColor: '#334155',
+                            backgroundColor: 'rgba(51, 65, 85, 0.05)',
+                            borderWidth: 3,
+                            fill: false,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#1e293b'
+                        },
+                        {
+                            label: 'พื้นที่น้ำในคลอง',
+                            data: [],
+                            showLine: true,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.35)',
+                            borderWidth: 2,
+                            fill: true,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: 'พิกัด X (เมตร)' }
+                        },
+                        y: {
+                            title: { display: true, text: 'ระดับ Y (เมตร)' }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `X: ${context.parsed.x.toFixed(2)} m, Y: ${context.parsed.y.toFixed(2)} m`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(waterLevel, waterPolygon) {
+            if (!chartInstance) return;
+
+            let sortedCanal = [...canalPoints].sort((a, b) => a.x - b.x);
+            chartInstance.data.datasets[0].data = sortedCanal.map(p => ({ x: p.x, y: p.y }));
+
+            let waterDataset = [];
+            if (waterPolygon && waterPolygon.length > 0) {
+                let sortedWater = [...waterPolygon].sort((a, b) => a.x - b.x);
+                waterDataset = sortedWater.map(p => ({ x: p.x, y: p.y }));
+            } else {
+                waterDataset = [
+                    { x: sortedCanal[0].x, y: waterLevel },
+                    { x: sortedCanal[sortedCanal.length - 1].x, y: waterLevel }
+                ];
+            }
+
+            chartInstance.data.datasets[1].data = waterDataset;
+            chartInstance.update();
+        }
+
+        window.onload = function() {
+            renderPointsInputs();
+            initChart();
+            calculateAll();
+        };
+    </script>
+
+</body>
+</html>
